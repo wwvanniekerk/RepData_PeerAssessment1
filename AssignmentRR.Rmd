@@ -1,0 +1,150 @@
+---
+title: "Reproducible Research Assignment Week 2"
+author: "WW van Niekerk"
+date: "10 March 2017"
+output: html_document
+---
+
+# Course Assignment: Week 2
+
+## Step 1: Getting the data
+I downloaded the file manualy and saved in my working directory, so I can just use the read.csv function to get the data
+
+```{r}
+activity <- read.csv("activity.csv",sep = ",",header = TRUE)
+head(activity)
+```
+
+I use the head data just to show the first 6 lines of the data.
+
+## Step 2: Transform the data
+I would like to use the tbl_df function to transform my data, so that I can use dplyr and tidyr packages.These packages makes clean and summarizing data alot easier.
+
+```{r,message=FALSE}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+activity <- tbl_df(activity)
+activity
+```
+
+I use the message = false so that the packages loaded messages are not displayed in the markdown file
+
+Next I will remove all rows with NA values, as I do not want to use those observations.
+
+```{r}
+na <- is.na(activity[["steps"]])
+activity <- activity[!na,]
+sum(is.na(activity))
+```
+
+I display the sum of the NA values in the activity table, the value is 0 because all the NA values was removed.
+
+## Step 3: What is mean total number of steps taken per day?
+### Calculate total number of steps taken per day
+
+Next I will creat a table which summarizes the activity table per day using ddply
+
+```{r}
+restruc <- group_by(activity,date)
+byday <- summarize(restruc, steps=sum(steps))
+byday
+```
+
+I create a new table that summarizes the sum of the steps per day.
+
+### Generate a histogram of total number of steps taken per day
+
+```{r}
+with(byday,hist(steps))
+```
+
+Histogram of total number of steps per day displayed above
+
+### Mean and median of total number of steps per day
+
+```{r}
+with(byday,summary(steps))
+```
+
+I use the summarise function just to display a bit more information
+
+## What is the activity pattern?
+
+First I will summarize the number of steps by interval
+
+```{r}
+restuc2 <- group_by(activity,interval)
+byinterval <- summarize(restuc2,steps=mean(steps))
+byinterval
+```
+
+Next I will plot the mean-xaxis and interval-yaxis as a type 1 time series plot
+
+```{r}
+with(byinterval,plot(interval,steps,type = "l",main = "average number of steps taken, averaged across all days"))
+```
+
+Next I wil display the max interval along with the average steps
+
+```{r}
+byinterval <- arrange(byinterval,steps)
+tail(byinterval,1)
+```
+
+## Imputing missing values
+
+First I will get the original data set and report the amount of NA values
+
+```{r}
+activity2 <- read.csv("activity.csv",sep = ",",header = TRUE)
+sum(is.na(activity2))
+```
+
+Next I will fill in the missing values by replacing the NA with the mean, rounded to nearest whole number, of the day it took place on
+
+```{r}
+for(i in 1:nrow(activity2)){
+  test = activity2[i,1]
+  if(is.na(test)){
+    j = match(activity2[i,3],byinterval$interval)
+    activity2[i,1]=byinterval$steps[j]
+}
+}
+head(activity2)
+sum(is.na(activity2))
+```
+
+As seen in the 6 rows of activity2 all NA has been removed and if that is not proof enough the sum of NA values in activity2 is also shown as 0
+
+I will use the same method as used above to compute the sum of total steps per day
+
+```{r}
+restruc3 <- group_by(activity2,date)
+byday2 <- summarize(restruc3,steps=sum(steps))
+byday2
+```
+
+Next histogram plot as well as mean and median of total steps taken per day
+
+```{r}
+with(byday2,hist(steps))
+summary(byday2$steps)
+summary(byday$steps)
+```
+
+As excpected the mean and median stays the same put the percentile will change due to a larger dataset
+
+## Are there differences in activity patterns between weekdays and weekends?
+
+First I will add a column to the activity2 column which specifies wheather a date is weekend or weekday
+
+```{r}
+activity2$dateType <-  ifelse(as.POSIXlt(activity2$date)$wday %in% c(0,6), 'weekend', 'weekday')
+activity3 <- aggregate(steps ~ interval + dateType, data=activity2, mean)
+ggplot(activity3, aes(interval, steps)) + 
+    geom_line() + 
+    facet_grid(.~ dateType ) +
+    xlab("5-minute interval") + 
+    ylab("avarage number of steps")
+```
